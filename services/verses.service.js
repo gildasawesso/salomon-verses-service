@@ -10,7 +10,7 @@ async function generate(verses) {
   tempResult = removeDots(tempResult);
   tempResult = splitVerses(tempResult);
   console.log('Nombre de verses', tempResult.length);
-  tempResult = normalizeVerses(tempResult);
+  // tempResult = normalizeVerses(tempResult);
   tempResult = await getVerses(tempResult);
 
   fs.writeFileSync('./assets/verses-text.txt', tempResult, 'utf-8');
@@ -86,7 +86,35 @@ function normalizeVerses(verses) {
   return verses;
 }
 
-function humanReadableVerse(verse) {
+function humanReadableVerse(verse, bookObject) {
+  let verseSplitedByFullColumn = verse.split(':');
+
+  let bookAndChapter = '';
+  let bookFirstPart = '';
+  let complexeBook = false;
+  // let book = '';
+  // let chapter = '';
+
+  if (verseSplitedByFullColumn[0].match(/^\d/gi)) {
+    // bookAndChapter = verseSplitedByFullColumn[1];
+    bookAndChapter = verseSplitedByFullColumn[0].match(/[a-zA-Z]*[0-9]+/gi)[1];
+    bookFirstPart = verseSplitedByFullColumn[0].match(/^\d/gi)[0];
+    complexeBook = true;
+  } else {
+    bookAndChapter = verseSplitedByFullColumn[0];
+  }
+
+  try {
+    let book = bookAndChapter.match(/^[a-zA-Z]*/gi);
+    let chapter = bookAndChapter.match(/\d*$/gi)[0];
+
+    return bookObject.book_name + ' ' + chapter + ':' + verseSplitedByFullColumn[1];
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function humanReadableVerseFR(verse) {
   let verseSplitedByFullColumn = verse.split(':');
 
   let bookAndChapter = '';
@@ -121,15 +149,35 @@ function humanReadableVerse(verse) {
   }
 }
 
+async function getVersesFr(verses) {
+  let versesText = [];
+  for(let i in verses) {
+    let verse = verses[i];
+    let verseObject = await getVerse(verse);
+    const bookObject = verseObject.book[0];
+    let readableVerse = humanReadableVerse(verse, bookObject);
+    let text = verseText(verseObject);
+    if(text == null) continue;
+    // console.log('processed verse : ', readableVerse);
+
+    versesText.push({
+      verseTitle: readableVerse,
+      verseBody: text
+    });
+  }
+  return versesText;
+}
+
 async function getVerses(verses) {
   let versesText = [];
   for(let i in verses) {
     let verse = verses[i];
     let verseObject = await getVerse(verse);
-    let readableVerse = humanReadableVerse(verse);
+    const bookObject = verseObject.book[0];
+    let readableVerse = humanReadableVerse(verse, bookObject);
     let text = verseText(verseObject);
     if(text == null) continue;
-    console.log('processed verse : ', readableVerse);
+    // console.log('processed verse : ', readableVerse);
     versesText.push({
       verseTitle: readableVerse,
       verseBody: text
@@ -151,7 +199,7 @@ function verseText(verseObject) {
 }
 
 async function getVerse(verse) {
-  let url = `http://getbible.net/json?p=${verse}&v=ls1910`;
+  let url = `http://getbible.net/json?p=${verse}&v=kjv`;
 
   try {
     const result = await fetch(url);

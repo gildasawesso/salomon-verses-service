@@ -35,7 +35,7 @@ async function sendMail(attachements, receiver) {
       from: '"WCIP Technical Unit 😀" <wciptech@gmail.com>',
       to: receiver,
       subject: "Versés",
-      text: "Test verses",
+      text: "Verses",
       attachments: attachements
     });
     transporter.close();
