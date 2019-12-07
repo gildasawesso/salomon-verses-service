@@ -4,17 +4,81 @@ let fetch = require('node-fetch');
 
 const versesRegex = /([1|2]?[a-zA-Z]{1,4}[\s|\.|0-9][0-9]{0,3}:[0-9]{0,3}-?[0-9]{0,3}(\/?[0-9]{0,3}-?[0-9]{0,3})+(?![a-zA-Z]{2,3}(\.|[0-9])))/gm;
 
-async function generate(verses) {
+async function generate(verses, language) {
   let tempResult = cleanVerses(verses);
   tempResult = matchedVerses(tempResult);
   tempResult = removeDots(tempResult);
   tempResult = splitVerses(tempResult);
+
   console.log('Nombre de verses', tempResult.length);
-  // tempResult = normalizeVerses(tempResult);
-  tempResult = await getVerses(tempResult);
+  tempResult = await getVerses(tempResult, language);
 
   fs.writeFileSync('./assets/verses-text.txt', tempResult, 'utf-8');
   return tempResult;
+}
+
+async function getVerses(verses, language) {
+  const versesText = [];
+  for (let i in verses) {
+    try {
+      let verse = verses[i];
+      console.log('Processing verse : ', verse);
+      let verseObject = await getVerse(verse, language);
+      const bookObject = verseObject.book[0];
+      let readableVerse = humanReadableVerse(verse, bookObject);
+      let text = verseText(verseObject);
+      if(text == null) continue;
+
+      versesText.push({
+        verseTitle: readableVerse,
+        verseBody: text
+      });
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  return versesText;
+}
+
+function humanReadableVerse(verse, bookObject) {
+  let verseSplitedByFullColumn = verse.split(':');
+
+  let bookAndChapter = '';
+  let bookFirstPart = '';
+  let complexeBook = false;
+
+  if (verseSplitedByFullColumn[0].match(/^\d/gi)) {
+    // bookAndChapter = verseSplitedByFullColumn[1];
+    bookAndChapter = verseSplitedByFullColumn[0].match(/[a-zA-Z]*[0-9]+/gi)[1];
+    bookFirstPart = verseSplitedByFullColumn[0].match(/^\d/gi)[0];
+    complexeBook = true;
+  } else {
+    bookAndChapter = verseSplitedByFullColumn[0];
+  }
+
+  try {
+    let book = bookAndChapter.match(/^[a-zA-Z]*/gi);
+    let chapter = bookAndChapter.match(/\d*$/gi)[0];
+
+    return bookObject.book_name + ' ' + chapter + ':' + verseSplitedByFullColumn[1];
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function getVerse(verse, language) {
+  let url = language === 'english' ? `http://getbible.net/json?p=${verse}&v=kjv` : `http://getbible.net/json?p=${verse}&v=ls1910`;
+
+  try {
+    const result = await fetch(url);
+    let data = await result.text();
+    data = data.replace(/\);|^\(/gi, '');
+    return JSON.parse(data);
+  } catch(err) {
+    console.error(err);
+    console.log('verse', verse);
+    return null;
+  }
 }
 
 function cleanVerses(str) {
@@ -86,34 +150,6 @@ function normalizeVerses(verses) {
   return verses;
 }
 
-function humanReadableVerse(verse, bookObject) {
-  let verseSplitedByFullColumn = verse.split(':');
-
-  let bookAndChapter = '';
-  let bookFirstPart = '';
-  let complexeBook = false;
-  // let book = '';
-  // let chapter = '';
-
-  if (verseSplitedByFullColumn[0].match(/^\d/gi)) {
-    // bookAndChapter = verseSplitedByFullColumn[1];
-    bookAndChapter = verseSplitedByFullColumn[0].match(/[a-zA-Z]*[0-9]+/gi)[1];
-    bookFirstPart = verseSplitedByFullColumn[0].match(/^\d/gi)[0];
-    complexeBook = true;
-  } else {
-    bookAndChapter = verseSplitedByFullColumn[0];
-  }
-
-  try {
-    let book = bookAndChapter.match(/^[a-zA-Z]*/gi);
-    let chapter = bookAndChapter.match(/\d*$/gi)[0];
-
-    return bookObject.book_name + ' ' + chapter + ':' + verseSplitedByFullColumn[1];
-  } catch (e) {
-    console.error(e);
-  }
-}
-
 function humanReadableVerseFR(verse) {
   let verseSplitedByFullColumn = verse.split(':');
 
@@ -168,23 +204,7 @@ async function getVersesFr(verses) {
   return versesText;
 }
 
-async function getVerses(verses) {
-  let versesText = [];
-  for(let i in verses) {
-    let verse = verses[i];
-    let verseObject = await getVerse(verse);
-    const bookObject = verseObject.book[0];
-    let readableVerse = humanReadableVerse(verse, bookObject);
-    let text = verseText(verseObject);
-    if(text == null) continue;
-    // console.log('processed verse : ', readableVerse);
-    versesText.push({
-      verseTitle: readableVerse,
-      verseBody: text
-    });
-  }
-  return versesText;
-}
+
 
 function verseText(verseObject) {
   let verses = [];
@@ -194,21 +214,6 @@ function verseText(verseObject) {
     }));
     return verses;
   } catch(err) {
-    return null;
-  }
-}
-
-async function getVerse(verse) {
-  let url = `http://getbible.net/json?p=${verse}&v=kjv`;
-
-  try {
-    const result = await fetch(url);
-    let data = await result.text();
-    data = data.replace(/\);|^\(/gi, '');
-    return JSON.parse(data);
-  } catch(err) {
-    console.error(err);
-    console.log('verse', verse);
     return null;
   }
 }

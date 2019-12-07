@@ -5,16 +5,17 @@ let verseService = require('../services/verses.service');
 let docxService = require('../services/docx.service');
 let mailService = require('../services/mail.service');
 
-router.post('/generate', async (req, res) => {
+router.post('/generate/:language', async (req, res) => {
+  const language = req.params.language === "1" ? "french": "english";
   let verses = req.body.verses;
   try {
-    let versesAsText = await verseService.generate(verses);
+    let versesAsText = await verseService.generate(verses, language);
     await docxService.generateDocx(versesAsText);
-    res.json(versesAsText);
+    await res.json(versesAsText);
   } catch(err) {
-    console.error(err);
     res.status(400);
-    res.json(err);
+    console.error(err);
+    await res.json(err);
   }
 });
 
